@@ -75,7 +75,7 @@ function renderCollections() {
             <div class="collection-sites">
                 ${collection.sites.map((site, siteIndex) => `
                     <a href="${escapeHtml(site.url)}" class="site-item" draggable="true" data-collection="${index}" data-site="${siteIndex}">
-                        <img class="site-favicon" src="${getFaviconUrl(site.url)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2218%22 font-size=%2218%22>🌐</text></svg>'">
+                        <img class="site-favicon" src="${getFaviconUrl(site.url)}" alt="${escapeHtml(site.name)} icon" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2218%22 font-size=%2218%22>🌐</text></svg>'">
                         <span class="site-name">${escapeHtml(site.name)}</span>
                     </a>
                 `).join('')}
@@ -257,9 +257,14 @@ function openAllSites(index) {
             });
             // Close the default new tab
             chrome.tabs.query({ windowId: window.id }, (tabs) => {
-                const firstTab = tabs[0];
-                if (firstTab.url === 'chrome://newtab/') {
-                    chrome.tabs.remove(firstTab.id);
+                if (tabs.length > 0) {
+                    const firstTab = tabs[0];
+                    // Check for new tab page (handles different Chrome versions/locales)
+                    if (firstTab.url === 'chrome://newtab/' || 
+                        firstTab.pendingUrl === 'chrome://newtab/' ||
+                        firstTab.url === 'about:blank') {
+                        chrome.tabs.remove(firstTab.id);
+                    }
                 }
             });
         });
@@ -368,7 +373,7 @@ async function loadOpenTabs() {
             
             tabsList.innerHTML = currentWindowTabs.map(tab => `
                 <div class="tab-item" draggable="true" data-tab-id="${tab.id}" data-tab-title="${escapeHtml(tab.title)}" data-tab-url="${escapeHtml(tab.url)}">
-                    <img class="tab-icon" src="${tab.favIconUrl || getFaviconUrl(tab.url)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2218%22 font-size=%2218%22>🌐</text></svg>'">
+                    <img class="tab-icon" src="${tab.favIconUrl || getFaviconUrl(tab.url)}" alt="${escapeHtml(tab.title)} icon" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2218%22 font-size=%2218%22>🌐</text></svg>'">
                     <span class="tab-title">${escapeHtml(tab.title)}</span>
                 </div>
             `).join('');
@@ -385,7 +390,7 @@ async function loadOpenTabs() {
         
         tabsList.innerHTML = sampleTabs.map((tab, id) => `
             <div class="tab-item" draggable="true" data-tab-id="${id}" data-tab-title="${escapeHtml(tab.title)}" data-tab-url="${escapeHtml(tab.url)}">
-                <img class="tab-icon" src="${getFaviconUrl(tab.url)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2218%22 font-size=%2218%22>🌐</text></svg>'">
+                <img class="tab-icon" src="${getFaviconUrl(tab.url)}" alt="${escapeHtml(tab.title)} icon" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2218%22 font-size=%2218%22>🌐</text></svg>'">
                 <span class="tab-title">${escapeHtml(tab.title)}</span>
             </div>
         `).join('');
@@ -507,14 +512,17 @@ async function importSelectedBookmarks() {
     } else {
         // Demo mode: create sample collections from checkboxes
         checkedBoxes.forEach((checkbox, index) => {
-            const folderName = checkbox.parentElement.querySelector('.bookmark-folder-name').textContent.replace('📁 ', '');
-            collections.push({
-                name: folderName,
-                sites: [
-                    { name: 'Örnek Site 1', url: 'https://example.com' },
-                    { name: 'Örnek Site 2', url: 'https://example.org' }
-                ]
-            });
+            const folderNameElement = checkbox.parentElement.querySelector('.bookmark-folder-name');
+            if (folderNameElement) {
+                const folderName = folderNameElement.textContent.replace('📁 ', '');
+                collections.push({
+                    name: folderName,
+                    sites: [
+                        { name: 'Örnek Site 1', url: 'https://example.com' },
+                        { name: 'Örnek Site 2', url: 'https://example.org' }
+                    ]
+                });
+            }
         });
     }
     
@@ -554,8 +562,11 @@ async function importBookmarkNode(node) {
 
 // Utility functions
 function escapeHtml(text) {
+    if (text === null || text === undefined) {
+        return '';
+    }
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = String(text);
     return div.innerHTML;
 }
 

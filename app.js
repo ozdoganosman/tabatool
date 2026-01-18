@@ -6,6 +6,9 @@ let collections = [];
 let draggedElement = null;
 let draggedTab = null;
 
+// Check if Chrome APIs are available
+const isChromeExtension = typeof chrome !== 'undefined' && chrome.storage;
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     await loadCollections();
@@ -17,19 +20,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Load collections from storage
 async function loadCollections() {
     return new Promise((resolve) => {
-        chrome.storage.local.get([STORAGE_KEY], (result) => {
-            collections = result[STORAGE_KEY] || [];
+        if (isChromeExtension) {
+            chrome.storage.local.get([STORAGE_KEY], (result) => {
+                collections = result[STORAGE_KEY] || [];
+                resolve();
+            });
+        } else {
+            // Fallback to localStorage for demo/testing
+            const stored = localStorage.getItem(STORAGE_KEY);
+            collections = stored ? JSON.parse(stored) : [];
             resolve();
-        });
+        }
     });
 }
 
 // Save collections to storage
 async function saveCollections() {
     return new Promise((resolve) => {
-        chrome.storage.local.set({ [STORAGE_KEY]: collections }, () => {
+        if (isChromeExtension) {
+            chrome.storage.local.set({ [STORAGE_KEY]: collections }, () => {
+                resolve();
+            });
+        } else {
+            // Fallback to localStorage for demo/testing
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(collections));
             resolve();
-        });
+        }
     });
 }
 
@@ -230,22 +246,29 @@ async function deleteCollection(index) {
 // Open all sites in collection
 function openAllSites(index) {
     const collection = collections[index];
-    chrome.windows.create({}, (window) => {
-        collection.sites.forEach((site, i) => {
-            chrome.tabs.create({
-                windowId: window.id,
-                url: site.url,
-                active: i === 0
+    if (isChromeExtension) {
+        chrome.windows.create({}, (window) => {
+            collection.sites.forEach((site, i) => {
+                chrome.tabs.create({
+                    windowId: window.id,
+                    url: site.url,
+                    active: i === 0
+                });
+            });
+            // Close the default new tab
+            chrome.tabs.query({ windowId: window.id }, (tabs) => {
+                const firstTab = tabs[0];
+                if (firstTab.url === 'chrome://newtab/') {
+                    chrome.tabs.remove(firstTab.id);
+                }
             });
         });
-        // Close the default new tab
-        chrome.tabs.query({ windowId: window.id }, (tabs) => {
-            const firstTab = tabs[0];
-            if (firstTab.url === 'chrome://newtab/') {
-                chrome.tabs.remove(firstTab.id);
-            }
+    } else {
+        // Demo mode: open in new tabs
+        collection.sites.forEach((site) => {
+            window.open(site.url, '_blank');
         });
-    });
+    }
 }
 
 // Setup drag and drop
@@ -332,24 +355,43 @@ async function handleCollectionDrop(e) {
 
 // Load open tabs
 async function loadOpenTabs() {
-    chrome.tabs.query({}, (tabs) => {
-        const tabsList = document.getElementById('tabsList');
-        const currentWindowTabs = tabs.filter(tab => !tab.url.startsWith('chrome://'));
+    const tabsList = document.getElementById('tabsList');
+    
+    if (isChromeExtension) {
+        chrome.tabs.query({}, (tabs) => {
+            const currentWindowTabs = tabs.filter(tab => !tab.url.startsWith('chrome://'));
+            
+            if (currentWindowTabs.length === 0) {
+                tabsList.innerHTML = '<p style="padding: 20px; text-align: center; color: var(--text-secondary);">Açık sekme bulunamadı</p>';
+                return;
+            }
+            
+            tabsList.innerHTML = currentWindowTabs.map(tab => `
+                <div class="tab-item" draggable="true" data-tab-id="${tab.id}" data-tab-title="${escapeHtml(tab.title)}" data-tab-url="${escapeHtml(tab.url)}">
+                    <img class="tab-icon" src="${tab.favIconUrl || getFaviconUrl(tab.url)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2218%22 font-size=%2218%22>🌐</text></svg>'">
+                    <span class="tab-title">${escapeHtml(tab.title)}</span>
+                </div>
+            `).join('');
+            
+            setupTabDragAndDrop();
+        });
+    } else {
+        // Demo mode: show sample tabs
+        const sampleTabs = [
+            { title: 'GitHub', url: 'https://github.com' },
+            { title: 'Google', url: 'https://google.com' },
+            { title: 'YouTube', url: 'https://youtube.com' }
+        ];
         
-        if (currentWindowTabs.length === 0) {
-            tabsList.innerHTML = '<p style="padding: 20px; text-align: center; color: var(--text-secondary);">Açık sekme bulunamadı</p>';
-            return;
-        }
-        
-        tabsList.innerHTML = currentWindowTabs.map(tab => `
-            <div class="tab-item" draggable="true" data-tab-id="${tab.id}" data-tab-title="${escapeHtml(tab.title)}" data-tab-url="${escapeHtml(tab.url)}">
-                <img class="tab-icon" src="${tab.favIconUrl || getFaviconUrl(tab.url)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2218%22 font-size=%2218%22>🌐</text></svg>'">
+        tabsList.innerHTML = sampleTabs.map((tab, id) => `
+            <div class="tab-item" draggable="true" data-tab-id="${id}" data-tab-title="${escapeHtml(tab.title)}" data-tab-url="${escapeHtml(tab.url)}">
+                <img class="tab-icon" src="${getFaviconUrl(tab.url)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2218%22 font-size=%2218%22>🌐</text></svg>'">
                 <span class="tab-title">${escapeHtml(tab.title)}</span>
             </div>
         `).join('');
         
         setupTabDragAndDrop();
-    });
+    }
 }
 
 // Setup tab drag and drop
@@ -376,9 +418,28 @@ function openBookmarkModal() {
     const modal = document.getElementById('bookmarkModal');
     const tree = document.getElementById('bookmarkTree');
     
-    chrome.bookmarks.getTree((bookmarkTreeNodes) => {
-        tree.innerHTML = renderBookmarkTree(bookmarkTreeNodes[0].children);
-    });
+    if (isChromeExtension) {
+        chrome.bookmarks.getTree((bookmarkTreeNodes) => {
+            tree.innerHTML = renderBookmarkTree(bookmarkTreeNodes[0].children);
+        });
+    } else {
+        // Demo mode: show sample bookmarks
+        const sampleBookmarks = [
+            { id: '1', title: 'Yer İşaretleri Çubuğu', children: [
+                { title: 'Google', url: 'https://google.com' },
+                { title: 'YouTube', url: 'https://youtube.com' }
+            ]},
+            { id: '2', title: 'İş', children: [
+                { title: 'GitHub', url: 'https://github.com' },
+                { title: 'Gmail', url: 'https://gmail.com' }
+            ]},
+            { id: '3', title: 'Haber', children: [
+                { title: 'BBC', url: 'https://bbc.com' },
+                { title: 'CNN', url: 'https://cnn.com' }
+            ]}
+        ];
+        tree.innerHTML = renderBookmarkTree(sampleBookmarks);
+    }
     
     modal.classList.add('active');
 }
@@ -432,15 +493,29 @@ async function importSelectedBookmarks() {
         return;
     }
     
-    for (const checkbox of checkedBoxes) {
-        const nodeId = checkbox.dataset.nodeId;
-        const nodes = await new Promise(resolve => {
-            chrome.bookmarks.getSubTree(nodeId, resolve);
-        });
-        
-        if (nodes && nodes[0]) {
-            await importBookmarkNode(nodes[0]);
+    if (isChromeExtension) {
+        for (const checkbox of checkedBoxes) {
+            const nodeId = checkbox.dataset.nodeId;
+            const nodes = await new Promise(resolve => {
+                chrome.bookmarks.getSubTree(nodeId, resolve);
+            });
+            
+            if (nodes && nodes[0]) {
+                await importBookmarkNode(nodes[0]);
+            }
         }
+    } else {
+        // Demo mode: create sample collections from checkboxes
+        checkedBoxes.forEach((checkbox, index) => {
+            const folderName = checkbox.parentElement.querySelector('.bookmark-folder-name').textContent.replace('📁 ', '');
+            collections.push({
+                name: folderName,
+                sites: [
+                    { name: 'Örnek Site 1', url: 'https://example.com' },
+                    { name: 'Örnek Site 2', url: 'https://example.org' }
+                ]
+            });
+        });
     }
     
     await saveCollections();

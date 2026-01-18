@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yeni Sekme</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar for Open Tabs -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h3>📑 Açık Sekmeler</h3>
+                <button class="close-sidebar" id="closeSidebar">✕</button>
+            </div>
+            <div class="tabs-list" id="tabsList">
+                <!-- Tabs will be loaded here -->
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h1>TabaTool</h1>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="toggleSidebar">📑 Açık Sekmeler</button>
+                    <button class="btn btn-primary" id="importBookmarks">📥 Yer İşaretleri İçe Aktar</button>
+                    <button class="btn btn-primary" id="addCollection">➕ Yeni Koleksiyon</button>
+                </div>
+            </header>
+
+            <div class="collections-container" id="collectionsContainer">
+                <!-- Collections will be loaded here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for adding/editing collections -->
+    <div class="modal" id="collectionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Yeni Koleksiyon</h2>
+                <button class="close-modal" id="closeModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="collectionId">
+                <div class="form-group">
+                    <label for="collectionName">Koleksiyon Adı</label>
+                    <input type="text" id="collectionName" placeholder="Örn: İş, Haber, Sosyal Medya">
+                </div>
+                <div class="form-group">
+                    <label>Siteler</label>
+                    <div id="sitesList" class="sites-list">
+                        <!-- Sites will be listed here -->
+                    </div>
+                    <button class="btn btn-secondary btn-sm" id="addSite">➕ Site Ekle</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelModal">İptal</button>
+                <button class="btn btn-primary" id="saveCollection">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for importing bookmarks -->
+    <div class="modal" id="bookmarkModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Yer İşaretleri İçe Aktar</h2>
+                <button class="close-modal" id="closeBookmarkModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>İçe aktarmak istediğiniz yer işareti klasörlerini seçin:</p>
+                <div id="bookmarkTree" class="bookmark-tree">
+                    <!-- Bookmark folders will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelBookmarkModal">İptal</button>
+                <button class="btn btn-primary" id="importSelectedBookmarks">İçe Aktar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
